@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat WebSocket</title>
+  <style>
+    /* Estilos básicos para la interfaz del chat */
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+
+    /* Área donde se mostrarán los mensajes */
+    #messages {
+      margin-top: 20px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 200px;
+      overflow-y: scroll; /* Permite hacer scroll si hay muchos mensajes */
+    }
+
+    /* Estilo para mostrar el nombre del usuario conectado */
+    #username {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Chat WebSocket</h1>
+
+  <!-- Muestra el nombre del usuario actualmente conectado -->
+  <p>Conectado como: <span id="username"></span></p>
+
+  <!-- Campo para escribir mensajes -->
+  <input type="text" id="inputMessage" placeholder="Escribe un mensaje..." />
+
+  <!-- Botón que llama a sendMessage() para enviar el mensaje al servidor -->
+  <button onclick="sendMessage()">Enviar</button>
+
+  <!-- Contenedor donde se mostrarán todos los mensajes -->
+  <div id="messages"></div>
+
+  <!-- Botón para reiniciar el chat (borra mensajes y simula cierre de sesión) -->
+  <button onclick="resetChat()">Salir</button>
+
+  <script>
+    // ==============================
+    // INICIALIZACIÓN Y CONEXIÓN
+    // ==============================
+
+    // Al cargar la página, se solicita al usuario que ingrese su nombre
+    const username = prompt("Ingresa tu nombre:");
+
+    // Se actualiza la interfaz para mostrar el nombre ingresado
+    document.getElementById('username').textContent = username;
+
+    // Se establece una conexión WebSocket con el servidor
+    const socket = new WebSocket('ws://localhost:3000');
+
+    // Una vez que la conexión está abierta, se envía un mensaje al servidor
+    // informando que este cliente ha iniciado sesión con su nombre
+    socket.addEventListener('open', () => {
+      socket.send(JSON.stringify({ type: 'login', username }));
+    });
+
+    // ==============================
+    // RECEPCIÓN DE MENSAJES
+    // ==============================
+
+    // Evento que se ejecuta cada vez que se recibe un mensaje del servidor
+    socket.addEventListener('message', (event) => {
+      let data;
+
+      try {
+        // Intenta analizar el mensaje como JSON
+        data = JSON.parse(event.data);
+
+        // Si es un mensaje de chat, muestra quién lo envió y qué dijo
+        if (data.type === 'chat') {
+          showMessage(`💬 ${data.username}: ${data.message}`);
+        }
+
+        // Si es una notificación de login, muestra que un usuario se unió
+        else if (data.type === 'login') {
+          showMessage(`👤 ${data.username} se ha unido al chat.`);
+        }
+
+        // Si se recibe una señal de reinicio, limpia el chat y solicita nombre de nuevo
+        else if (data.type === 'reset') {
+          // Limpia todos los mensajes en pantalla
+          document.getElementById('messages').innerHTML = '';
+
+          // Notifica que el chat ha sido reiniciado
+          showMessage('🧹 El chat ha sido reiniciado.');
+
+          // Solicita nuevamente el nombre del usuario
+          const newUsername = prompt("Ingresa tu nombre nuevamente:");
+
+          // Actualiza el nombre mostrado en pantalla
+          document.getElementById('username').textContent = newUsername;
+
+          // Envía el nuevo login al servidor
+          socket.send(JSON.stringify({ type: 'login', username: newUsername }));
+        }
+
+        // Para cualquier otro tipo de mensaje, se muestra como notificación general
+        else {
+          showMessage(`📢 ${data.message}`);
+        }
+      } catch (e) {
+        // Si el mensaje no es JSON válido (texto plano, por ejemplo)
+        // intenta extraer un nombre de usuario si está presente
+        const match = event.data.match(/"username"\s*:\s*"([^"]+)"/);
+        if (match) {
+          showMessage(`👤 ${match[1]}`);
+        } else {
+          // Si no se puede analizar, se muestra el mensaje tal cual
+          showMessage(event.data);
+        }
+      }
+    });
+
+    // ==============================
+    // ENVÍO DE MENSAJES
+    // ==============================
+
+    // Función para mostrar un mensaje en el contenedor del chat
+    function showMessage(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      document.getElementById('messages').appendChild(div);
+    }
+
+    // Función para enviar el contenido del input al servidor como mensaje
+    function sendMessage() {
+      const input = document.getElementById('inputMessage');
+      const message = input.value.trim(); // Quita espacios al inicio y final
+
+      // Solo se envía si el mensaje no está vacío
+      if (message) {
+        // Envía un mensaje de tipo 'chat' con el texto al servidor
+        socket.send(JSON.stringify({ type: 'chat', message }));
+
+        // Limpia el input para permitir escribir uno nuevo
+        input.value = '';
+      }
+    }
+
+    // ==============================
+    // REINICIAR CHAT / SALIR
+    // ==============================
+
+    // Función que reinicia el chat localmente y envía señal al servidor
+    function resetChat() {
+      // Borra los mensajes actuales de la vista
+      document.getElementById('messages').innerHTML = '';
+
+      // Envía una solicitud al servidor para reiniciar (puede afectar a todos o solo a este cliente)
+      socket.send(JSON.stringify({ type: 'reset' }));
+    }
+  </script>
+
+</body>
+</html>
