@@ -88,7 +88,7 @@ wss.on('connection', (ws) => {
 });
 
 // Iniciamos el servidor HTTP en el puerto 3000
-server.listen(3000, () => {
-  console.log('Servidor corriendo en http://localhost:3000');
+server.listen(3002, () => {
+  console.log('Servidor corriendo en http://localhost:3002');
 });
 // Exportamos el servidor para que pueda ser usado en pruebas o en otros módulos
